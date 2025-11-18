@@ -36,13 +36,30 @@ export default async function PortalLayout({
   }
 
   // Get client info for the user
-  const { data: userClient } = await supabase
-    .from("user_clients")
-    .select("client_id, clients(name)")
-    .eq("user_id", user.id)
-    .single();
+  let clientName = "Client";
+  try {
+    const { data: userClient, error } = await supabase
+      .from("user_clients")
+      .select("client_id, clients(name)")
+      .eq("user_id", user.id)
+      .single();
 
-  const clientName = (userClient?.clients as any)?.name || "Client";
+    if (error) {
+      console.error("Error fetching user client:", error);
+      // If user_clients table doesn't exist or user not linked, show helpful message
+      if (error.code === '42P01' || error.code === 'PGRST116') {
+        throw new Error(
+          "Database not set up. Please run the migration: supabase/migrations/002_client_portal_rls.sql"
+        );
+      }
+    }
+
+    clientName = (userClient?.clients as any)?.name || user.email?.split('@')[0] || "Client";
+  } catch (error: any) {
+    console.error("Portal layout error:", error);
+    // Don't crash the whole app, just log the error and use default name
+    clientName = user.email?.split('@')[0] || "Client";
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

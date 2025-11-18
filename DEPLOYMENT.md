@@ -1,5 +1,19 @@
 # Deployment Guide for Clepto Client Portal
 
+## 🚀 Quick Diagnostic Check
+
+**NEW**: After deploying, visit `/setup` to run automated diagnostics!
+
+Example: `https://your-domain.vercel.app/setup`
+
+This page will check:
+- ✅ Environment variables are set
+- ✅ Database connection works
+- ✅ Required tables exist
+- ✅ Configuration is complete
+
+---
+
 ## Quick Deploy to Vercel
 
 1. **Push to GitHub** (already done ✅)
