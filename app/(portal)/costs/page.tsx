@@ -1,4 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -8,45 +11,128 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { Activity } from "lucide-react";
 
-export default async function CostsPage() {
-  const supabase = await createClient();
+interface Execution {
+  id: string;
+  workflow_name: string;
+  ai_provider: string;
+  cost: number;
+  executed_at: string;
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+interface ProviderData {
+  name: string;
+  count: number;
+  cost: number;
+}
 
-  if (!user) {
-    return null;
-  }
+interface WorkflowData {
+  name: string;
+  count: number;
+  cost: number;
+  avgCost: number;
+}
 
-  // Get user's client
-  const { data: userClient } = await supabase
-    .from("user_clients")
-    .select("client_id")
-    .eq("user_id", user.id)
-    .single();
+export default function CostsPage() {
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [isLive, setIsLive] = useState(false);
+  const { toast } = useToast();
+  const supabase = createClient();
 
-  const clientId = userClient?.client_id;
+  // Load initial data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-  // Get last 30 days of executions
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        if (!user) return;
 
-  const { data: executions } = await supabase
-    .from("workflow_executions")
-    .select("*")
-    .eq("client_id", clientId)
-    .gte("executed_at", thirtyDaysAgo.toISOString())
-    .order("executed_at", { ascending: false });
+        const { data: userClient } = await supabase
+          .from("user_clients")
+          .select("client_id")
+          .eq("user_id", user.id)
+          .single();
 
-  const safeExecutions = executions || [];
+        if (!userClient) return;
+
+        setClientId(userClient.client_id);
+
+        // Get last 30 days of executions
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const { data, error } = await supabase
+          .from("workflow_executions")
+          .select("*")
+          .eq("client_id", userClient.client_id)
+          .gte("executed_at", thirtyDaysAgo.toISOString())
+          .order("executed_at", { ascending: false });
+
+        if (error) throw error;
+        setExecutions(data || []);
+      } catch (error) {
+        console.error("Error loading costs:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Subscribe to Realtime updates
+  useEffect(() => {
+    if (!clientId) return;
+
+    setIsLive(true);
+
+    const channel = supabase
+      .channel("costs_updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "workflow_executions",
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload) => {
+          console.log("New execution received for costs:", payload);
+
+          const newExecution = payload.new as Execution;
+
+          // Add to executions list
+          setExecutions((prev) => [newExecution, ...prev]);
+
+          // Show toast notification
+          toast({
+            title: "Cost Updated",
+            description: `New execution added: $${(newExecution.cost || 0).toFixed(4)}`,
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setIsLive(false);
+    };
+  }, [clientId, toast]);
 
   // Calculate total cost
-  const totalCost = safeExecutions.reduce((sum, e) => sum + (e.cost || 0), 0);
+  const totalCost = executions.reduce((sum, e) => sum + (e.cost || 0), 0);
 
   // Group by provider
-  const costByProvider = safeExecutions.reduce((acc: any, e) => {
+  const costByProvider = executions.reduce((acc: any, e) => {
     const provider = e.ai_provider || "Unknown";
     if (!acc[provider]) {
       acc[provider] = { count: 0, cost: 0 };
@@ -57,7 +143,7 @@ export default async function CostsPage() {
   }, {});
 
   // Group by workflow
-  const costByWorkflow = safeExecutions.reduce((acc: any, e) => {
+  const costByWorkflow = executions.reduce((acc: any, e) => {
     const workflow = e.workflow_name || "Unnamed";
     if (!acc[workflow]) {
       acc[workflow] = { count: 0, cost: 0 };
@@ -67,7 +153,7 @@ export default async function CostsPage() {
     return acc;
   }, {});
 
-  const providerData = Object.entries(costByProvider)
+  const providerData: ProviderData[] = Object.entries(costByProvider)
     .map(([name, data]: [string, any]) => ({
       name,
       count: data.count,
@@ -75,7 +161,7 @@ export default async function CostsPage() {
     }))
     .sort((a, b) => b.cost - a.cost);
 
-  const workflowData = Object.entries(costByWorkflow)
+  const workflowData: WorkflowData[] = Object.entries(costByWorkflow)
     .map(([name, data]: [string, any]) => ({
       name,
       count: data.count,
@@ -85,13 +171,32 @@ export default async function CostsPage() {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 10);
 
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <Skeleton className="h-20 w-96" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-96" />
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">AI Cost Analytics</h1>
-        <p className="text-muted-foreground">
-          Track and analyze your AI usage costs
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">AI Cost Analytics</h1>
+          <p className="text-muted-foreground">
+            Track and analyze your AI usage costs
+          </p>
+        </div>
+        {isLive && (
+          <div className="flex items-center gap-2 text-sm text-green-600">
+            <Activity className="h-4 w-4 animate-pulse" />
+            <span>Live</span>
+          </div>
+        )}
       </div>
 
       {/* Total Cost Card */}
@@ -104,7 +209,7 @@ export default async function CostsPage() {
             ${totalCost.toFixed(2)}
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            Across {safeExecutions.length} workflow executions
+            Across {executions.length} workflow executions
           </p>
         </CardContent>
       </Card>
@@ -138,7 +243,7 @@ export default async function CostsPage() {
                       ${provider.cost.toFixed(4)}
                     </TableCell>
                     <TableCell>
-                      {((provider.cost / totalCost) * 100).toFixed(1)}%
+                      {totalCost > 0 ? ((provider.cost / totalCost) * 100).toFixed(1) : "0.0"}%
                     </TableCell>
                   </TableRow>
                 ))}

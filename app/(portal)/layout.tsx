@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/logout-button";
+import { Toaster } from "@/components/ui/toaster";
 
 export default async function PortalLayout({
   children,
@@ -125,6 +126,9 @@ export default async function PortalLayout({
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">{children}</main>
+
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   );
 }
