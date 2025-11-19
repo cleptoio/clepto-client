@@ -17,6 +17,8 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { Activity } from "lucide-react";
 
 interface Execution {
   id: string;
@@ -34,7 +36,10 @@ export default function ExecutionsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [isLive, setIsLive] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     loadExecutions();
@@ -56,6 +61,8 @@ export default function ExecutionsPage() {
 
       if (!userClient) return;
 
+      setClientId(userClient.client_id);
+
       // Fetch executions for this client
       const { data, error } = await supabase
         .from("workflow_executions")
@@ -72,6 +79,48 @@ export default function ExecutionsPage() {
       setLoading(false);
     }
   };
+
+  // Subscribe to Realtime updates
+  useEffect(() => {
+    if (!clientId) return;
+
+    const supabase = createClient();
+    setIsLive(true);
+
+    const channel = supabase
+      .channel("executions_list")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "workflow_executions",
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload) => {
+          console.log("New execution received:", payload);
+
+          const newExecution = payload.new as Execution;
+
+          // Prepend to the list
+          setExecutions((prev) => [newExecution, ...prev]);
+
+          // Show toast notification
+          toast({
+            title: "New Execution",
+            description: `${newExecution.workflow_name || "Unnamed Workflow"} - ${newExecution.status}`,
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setIsLive(false);
+    };
+  }, [clientId, toast]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -124,11 +173,19 @@ export default function ExecutionsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Workflow Executions</h1>
-        <p className="text-muted-foreground">
-          View and filter all your workflow execution history
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Workflow Executions</h1>
+          <p className="text-muted-foreground">
+            View and filter all your workflow execution history
+          </p>
+        </div>
+        {isLive && (
+          <div className="flex items-center gap-2 text-sm text-green-600">
+            <Activity className="h-4 w-4 animate-pulse" />
+            <span>Live</span>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}

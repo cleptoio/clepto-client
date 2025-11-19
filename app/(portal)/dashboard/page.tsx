@@ -1,4 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,62 +13,126 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDistanceToNow } from "date-fns";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { Activity } from "lucide-react";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
+interface Execution {
+  id: string;
+  workflow_name: string;
+  status: string;
+  cost: number;
+  duration_ms: number;
+  executed_at: string;
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function DashboardPage() {
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [clientName, setClientName] = useState("Client");
+  const [isLive, setIsLive] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  const supabase = createClient();
 
-  if (!user) {
-    return null;
-  }
+  // Get user and client ID
+  useEffect(() => {
+    const fetchClientId = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  // Get user's client
-  const { data: userClient } = await supabase
-    .from("user_clients")
-    .select("client_id, clients(name)")
-    .eq("user_id", user.id)
-    .single();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-  const clientId = userClient?.client_id;
-  const clientName = (userClient?.clients as any)?.name || "Client";
+      const { data: userClient } = await supabase
+        .from("user_clients")
+        .select("client_id, clients(name)")
+        .eq("user_id", user.id)
+        .single();
 
-  // Get recent executions (last 30 days)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      if (userClient) {
+        setClientId(userClient.client_id);
+        setClientName((userClient.clients as any)?.name || "Client");
+      }
+    };
 
-  const { data: executions } = await supabase
-    .from("workflow_executions")
-    .select("*")
-    .eq("client_id", clientId)
-    .gte("executed_at", thirtyDaysAgo.toISOString())
-    .order("executed_at", { ascending: false })
-    .limit(10);
+    fetchClientId();
+  }, []);
 
-  const safeExecutions = executions || [];
+  // Load initial executions
+  useEffect(() => {
+    if (!clientId) return;
 
-  // Calculate metrics
-  const totalExecutions = safeExecutions.length;
-  const successfulExecutions = safeExecutions.filter(
-    (e) => e.status === "success"
-  ).length;
-  const successRate =
-    totalExecutions > 0
-      ? ((successfulExecutions / totalExecutions) * 100).toFixed(1)
-      : "0.0";
-  const totalCost = safeExecutions
-    .reduce((sum, e) => sum + (e.cost || 0), 0)
-    .toFixed(2);
-  const avgExecutionTime =
-    totalExecutions > 0
-      ? (
-          safeExecutions.reduce((sum, e) => sum + (e.duration_ms || 0), 0) /
-          totalExecutions
-        ).toFixed(0)
-      : "0";
+    const loadExecutions = async () => {
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const { data, error } = await supabase
+          .from("workflow_executions")
+          .select("*")
+          .eq("client_id", clientId)
+          .gte("executed_at", thirtyDaysAgo.toISOString())
+          .order("executed_at", { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+        setExecutions(data || []);
+      } catch (error) {
+        console.error("Error loading executions:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadExecutions();
+  }, [clientId]);
+
+  // Subscribe to Realtime updates
+  useEffect(() => {
+    if (!clientId) return;
+
+    setIsLive(true);
+
+    const channel = supabase
+      .channel("dashboard_executions")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "workflow_executions",
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload) => {
+          console.log("New execution received:", payload);
+
+          const newExecution = payload.new as Execution;
+
+          // Add to the top of the list and keep only the last 10
+          setExecutions((prev) => [newExecution, ...prev].slice(0, 10));
+
+          // Show toast notification
+          toast({
+            title: "Workflow Completed",
+            description: `${newExecution.workflow_name || "Unnamed Workflow"} finished with status: ${newExecution.status}`,
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setIsLive(false);
+    };
+  }, [clientId, toast]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -80,15 +147,58 @@ export default async function DashboardPage() {
     }
   };
 
+  // Calculate metrics
+  const totalExecutions = executions.length;
+  const successfulExecutions = executions.filter(
+    (e) => e.status === "success"
+  ).length;
+  const successRate =
+    totalExecutions > 0
+      ? ((successfulExecutions / totalExecutions) * 100).toFixed(1)
+      : "0.0";
+  const totalCost = executions
+    .reduce((sum, e) => sum + (e.cost || 0), 0)
+    .toFixed(2);
+  const avgExecutionTime =
+    totalExecutions > 0
+      ? (
+          executions.reduce((sum, e) => sum + (e.duration_ms || 0), 0) /
+          totalExecutions
+        ).toFixed(0)
+      : "0";
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <Skeleton className="h-20 w-96" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome back, {clientName}!
-        </h1>
-        <p className="text-muted-foreground">
-          Here&apos;s what&apos;s happening with your workflows
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome back, {clientName}!
+          </h1>
+          <p className="text-muted-foreground">
+            Here&apos;s what&apos;s happening with your workflows
+          </p>
+        </div>
+        {isLive && (
+          <div className="flex items-center gap-2 text-sm text-green-600">
+            <Activity className="h-4 w-4 animate-pulse" />
+            <span>Live</span>
+          </div>
+        )}
       </div>
 
       {/* Metrics Cards */}
@@ -143,7 +253,7 @@ export default async function DashboardPage() {
           <CardTitle>Recent Activity</CardTitle>
         </CardHeader>
         <CardContent>
-          {safeExecutions.length === 0 ? (
+          {executions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No workflow executions yet. Your data will appear here once
               workflows run.
@@ -159,13 +269,11 @@ export default async function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {safeExecutions.map((execution) => (
+                {executions.map((execution) => (
                   <TableRow
                     key={execution.id}
                     className="cursor-pointer"
-                    onClick={() =>
-                      (window.location.href = `/executions/${execution.id}`)
-                    }
+                    onClick={() => router.push(`/executions/${execution.id}`)}
                   >
                     <TableCell className="font-medium">
                       {execution.workflow_name || "Unnamed Workflow"}
