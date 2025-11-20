@@ -14,6 +14,22 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Activity } from "lucide-react";
+import { format, subDays } from "date-fns";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 interface Execution {
   id: string;
@@ -171,6 +187,32 @@ export default function CostsPage() {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 10);
 
+  // Daily cost trend (last 14 days)
+  const dailyCostData = Array.from({ length: 14 }, (_, i) => {
+    const date = subDays(new Date(), 13 - i);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayExecutions = executions.filter(e =>
+      format(new Date(e.executed_at), 'yyyy-MM-dd') === dateStr
+    );
+    return {
+      date: format(date, 'MMM dd'),
+      cost: dayExecutions.reduce((sum, e) => sum + (e.cost || 0), 0),
+    };
+  });
+
+  // Provider pie chart data
+  const COLORS = ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+  const providerPieData = providerData.map((p, i) => ({
+    ...p,
+    color: COLORS[i % COLORS.length],
+  }));
+
+  // Top 5 workflows bar chart
+  const topWorkflowsBarData = workflowData.slice(0, 5).map(w => ({
+    name: w.name.length > 20 ? w.name.substring(0, 20) + '...' : w.name,
+    cost: parseFloat(w.cost.toFixed(2)),
+  }));
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -214,10 +256,112 @@ export default function CostsPage() {
         </CardContent>
       </Card>
 
-      {/* Cost by Provider */}
+      {/* Charts Section */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Daily Cost Trend */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Daily Cost Trend (Last 14 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={dailyCostData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
+                <YAxis stroke="#64748b" fontSize={12} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number) => `$${value.toFixed(4)}`}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="cost"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={{ fill: '#3b82f6', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Provider Distribution Pie Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Cost by Provider</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {providerPieData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No provider data available yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={providerPieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) =>
+                      `${name}: ${((percent || 0) * 100).toFixed(0)}%`
+                    }
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="cost"
+                  >
+                    {providerPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => `$${value.toFixed(4)}`} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top Workflows Bar Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 5 Workflows by Cost</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topWorkflowsBarData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No workflow data available yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={topWorkflowsBarData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={11} angle={-15} textAnchor="end" height={80} />
+                  <YAxis stroke="#64748b" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                    }}
+                    formatter={(value: number) => `$${value.toFixed(2)}`}
+                  />
+                  <Bar dataKey="cost" fill="#06b6d4" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Cost by Provider Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Cost by AI Provider</CardTitle>
+          <CardTitle>Detailed Cost by AI Provider</CardTitle>
         </CardHeader>
         <CardContent>
           {providerData.length === 0 ? (

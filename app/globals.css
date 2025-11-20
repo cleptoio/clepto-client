@@ -1,22 +1,46 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: oklch(100% 0 0);
-  --color-foreground: oklch(9% 0 0);
-  --color-card: oklch(100% 0 0);
-  --color-card-foreground: oklch(9% 0 0);
+  /* Professional Light Theme Colors */
+  --color-background: oklch(100% 0 0); /* White */
+  --color-foreground: oklch(17.6% 0.019 256.8); /* Dark blue-gray #0f172a */
+  --color-card: oklch(100% 0 0); /* White */
+  --color-card-foreground: oklch(17.6% 0.019 256.8);
   --color-popover: oklch(100% 0 0);
-  --color-popover-foreground: oklch(9% 0 0);
+  --color-popover-foreground: oklch(17.6% 0.019 256.8);
+
+  /* Primary: Blue #3b82f6 */
   --color-primary: oklch(59.8% 0.226 263.3);
   --color-primary-foreground: oklch(98% 0 0);
-  --color-secondary: oklch(64.8% 0.036 259.8);
-  --color-secondary-foreground: oklch(11.2% 0.026 259.8);
-  --color-muted: oklch(96.1% 0 0);
-  --color-muted-foreground: oklch(64.8% 0.036 259.8);
-  --color-accent: oklch(96.1% 0 0);
-  --color-accent-foreground: oklch(11.2% 0.026 259.8);
-  --color-destructive: oklch(60.2% 0.199 27.3);
+
+  /* Secondary: Cyan #06b6d4 */
+  --color-secondary: oklch(70.2% 0.137 219.6);
+  --color-secondary-foreground: oklch(98% 0 0);
+
+  /* Muted: Light gray #f8fafc */
+  --color-muted: oklch(98.6% 0.002 256.8);
+  --color-muted-foreground: oklch(55.3% 0.031 256.8); /* #64748b */
+
+  /* Accent: Clepto cyan #00F2EA */
+  --color-accent: oklch(88.7% 0.137 196.8);
+  --color-accent-foreground: oklch(17.6% 0.019 256.8);
+
+  /* Success: Green #10b981 */
+  --color-success: oklch(68.4% 0.166 166.1);
+  --color-success-foreground: oklch(98% 0 0);
+
+  /* Warning: Amber #f59e0b */
+  --color-warning: oklch(76.9% 0.166 73.3);
+  --color-warning-foreground: oklch(17.6% 0.019 256.8);
+
+  /* Error/Destructive: Red #ef4444 */
+  --color-destructive: oklch(62.8% 0.257 27.3);
   --color-destructive-foreground: oklch(98% 0 0);
+
+  /* Info: Cyan #06b6d4 */
+  --color-info: oklch(70.2% 0.137 219.6);
+  --color-info-foreground: oklch(98% 0 0);
+
   --color-border: oklch(91.4% 0.014 259.8);
   --color-input: oklch(91.4% 0.014 259.8);
   --color-ring: oklch(59.8% 0.226 263.3);

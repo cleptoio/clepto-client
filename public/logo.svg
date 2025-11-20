@@ -1,0 +1,29 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circuit-style C icon -->
+  <g>
+    <!-- Main C shape -->
+    <path d="M28 20C28 13.3726 22.6274 8 16 8C9.37258 8 4 13.3726 4 20C4 26.6274 9.37258 32 16 32"
+          stroke="#00F2EA" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Circuit nodes on the C -->
+    <circle cx="16" cy="8" r="2" fill="#00F2EA"/>
+    <circle cx="28" cy="20" r="2" fill="#00F2EA"/>
+    <circle cx="16" cy="32" r="2" fill="#00F2EA"/>
+
+    <!-- Internal circuit pattern -->
+    <line x1="10" y1="15" x2="14" y2="15" stroke="#3b82f6" stroke-width="1.5"/>
+    <line x1="14" y1="15" x2="14" y2="20" stroke="#3b82f6" stroke-width="1.5"/>
+    <circle cx="14" cy="20" r="1.5" fill="#3b82f6"/>
+
+    <line x1="10" y1="25" x2="18" y2="25" stroke="#06b6d4" stroke-width="1.5"/>
+    <circle cx="18" cy="25" r="1.5" fill="#06b6d4"/>
+  </g>
+
+  <!-- Clepto.io text -->
+  <text x="38" y="26" font-family="Orbitron, sans-serif" font-size="16" font-weight="700" fill="#0f172a">
+    Clepto
+  </text>
+  <text x="94" y="26" font-family="Orbitron, sans-serif" font-size="16" font-weight="400" fill="#3b82f6">
+    .io
+  </text>
+</svg>
