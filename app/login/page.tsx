@@ -48,7 +48,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="text-3xl font-bold text-primary">Clepto.io</div>
+            <img src="/logo.svg" alt="Clepto.io" className="h-12" />
           </div>
           <CardTitle className="text-2xl text-center">Client Portal</CardTitle>
           <CardDescription className="text-center">
