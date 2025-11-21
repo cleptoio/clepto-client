@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useClient } from '@/contexts/ClientContext';
 import { createClient } from '@/lib/supabase';
 import { WorkflowExecution } from '@/types/database';
@@ -30,18 +30,7 @@ export default function ExecutionsPage() {
     const { toast } = useToast();
     const itemsPerPage = 25;
 
-    useEffect(() => {
-        if (!clientLoading && clientId) {
-            fetchExecutions();
-            subscribeToExecutions();
-        }
-    }, [clientId, clientLoading]);
-
-    useEffect(() => {
-        filterExecutions();
-    }, [executions, searchQuery, statusFilter, providerFilter]);
-
-    const fetchExecutions = async () => {
+    const fetchExecutions = useCallback(async () => {
         if (!clientId) return;
 
         try {
@@ -64,9 +53,9 @@ export default function ExecutionsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [clientId, toast]);
 
-    const subscribeToExecutions = () => {
+    const subscribeToExecutions = useCallback(() => {
         if (!clientId) return;
 
         const supabase = createClient();
@@ -94,9 +83,9 @@ export default function ExecutionsPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    };
+    }, [clientId, toast]);
 
-    const filterExecutions = () => {
+    const filterExecutions = useCallback(() => {
         let filtered = executions;
 
         if (searchQuery) {
@@ -117,7 +106,18 @@ export default function ExecutionsPage() {
 
         setFilteredExecutions(filtered);
         setCurrentPage(1);
-    };
+    }, [executions, searchQuery, statusFilter, providerFilter]);
+
+    useEffect(() => {
+        if (!clientLoading && clientId) {
+            fetchExecutions();
+            subscribeToExecutions();
+        }
+    }, [clientId, clientLoading, fetchExecutions, subscribeToExecutions]);
+
+    useEffect(() => {
+        filterExecutions();
+    }, [filterExecutions]);
 
     const handleExport = () => {
         const exportData = filteredExecutions.map((e) => ({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useClient } from '@/contexts/ClientContext';
 import { createClient } from '@/lib/supabase';
 import { Project } from '@/types/database';
@@ -16,13 +16,7 @@ export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (!clientLoading && clientId) {
-            fetchProjects();
-        }
-    }, [clientId, clientLoading]);
-
-    const fetchProjects = async () => {
+    const fetchProjects = useCallback(async () => {
         if (!clientId) return;
 
         try {
@@ -40,7 +34,13 @@ export default function ProjectsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [clientId]);
+
+    useEffect(() => {
+        if (!clientLoading && clientId) {
+            fetchProjects();
+        }
+    }, [clientId, clientLoading, fetchProjects]);
 
     if (clientLoading || loading) {
         return (

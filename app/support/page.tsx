@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useClient } from '@/contexts/ClientContext';
 import { createClient } from '@/lib/supabase';
 import { SupportTicket } from '@/types/database';
@@ -33,14 +33,7 @@ export default function SupportPage() {
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
 
-    useEffect(() => {
-        if (!clientLoading && clientId) {
-            fetchTickets();
-            subscribeToTickets();
-        }
-    }, [clientId, clientLoading]);
-
-    const fetchTickets = async () => {
+    const fetchTickets = useCallback(async () => {
         if (!clientId) return;
 
         try {
@@ -58,9 +51,9 @@ export default function SupportPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [clientId]);
 
-    const subscribeToTickets = () => {
+    const subscribeToTickets = useCallback(() => {
         if (!clientId) return;
 
         const supabase = createClient();
@@ -93,7 +86,14 @@ export default function SupportPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    };
+    }, [clientId, toast]);
+
+    useEffect(() => {
+        if (!clientLoading && clientId) {
+            fetchTickets();
+            subscribeToTickets();
+        }
+    }, [clientId, clientLoading, fetchTickets, subscribeToTickets]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

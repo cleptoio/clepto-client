@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useClient } from '@/contexts/ClientContext';
 import { createClient } from '@/lib/supabase';
 import { SubProcessor, DPASignature } from '@/types/database';
@@ -20,13 +20,7 @@ export default function CompliancePage() {
     const [dpaSignature, setDPASignature] = useState<DPASignature | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (!clientLoading && clientId) {
-            fetchComplianceData();
-        }
-    }, [clientId, clientLoading]);
-
-    const fetchComplianceData = async () => {
+    const fetchComplianceData = useCallback(async () => {
         if (!clientId) return;
 
         try {
@@ -52,7 +46,13 @@ export default function CompliancePage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [clientId]);
+
+    useEffect(() => {
+        if (!clientLoading && clientId) {
+            fetchComplianceData();
+        }
+    }, [clientId, clientLoading, fetchComplianceData]);
 
     if (clientLoading || loading) {
         return (

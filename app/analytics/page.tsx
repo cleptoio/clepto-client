@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useClient } from '@/contexts/ClientContext';
 import { createClient } from '@/lib/supabase';
 import { WorkflowExecution } from '@/types/database';
@@ -19,13 +19,7 @@ export default function AnalyticsPage() {
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState('30');
 
-    useEffect(() => {
-        if (!clientLoading && clientId) {
-            fetchExecutions();
-        }
-    }, [clientId, clientLoading]);
-
-    const fetchExecutions = async () => {
+    const fetchExecutions = useCallback(async () => {
         if (!clientId) return;
 
         try {
@@ -43,7 +37,13 @@ export default function AnalyticsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [clientId]);
+
+    useEffect(() => {
+        if (!clientLoading && clientId) {
+            fetchExecutions();
+        }
+    }, [clientId, clientLoading, fetchExecutions]);
 
     const daysCount = parseInt(dateRange);
     const cutoffDate = new Date();
