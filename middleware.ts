@@ -1,69 +1,76 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  try {
-    let supabaseResponse = NextResponse.next({
-      request,
-    });
+    let response = NextResponse.next({
+        request: {
+            headers: request.headers,
+        },
+    })
 
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            );
-            supabaseResponse = NextResponse.next({
-              request,
-            });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            );
-          },
-        },
-      }
-    );
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return request.cookies.get(name)?.value
+                },
+                set(name: string, value: string, options: any) {
+                    request.cookies.set({
+                        name,
+                        value,
+                        ...options,
+                    })
+                    response = NextResponse.next({
+                        request: {
+                            headers: request.headers,
+                        },
+                    })
+                    response.cookies.set({
+                        name,
+                        value,
+                        ...options,
+                    })
+                },
+                remove(name: string, options: any) {
+                    request.cookies.set({
+                        name,
+                        value: '',
+                        ...options,
+                    })
+                    response = NextResponse.next({
+                        request: {
+                            headers: request.headers,
+                        },
+                    })
+                    response.cookies.set({
+                        name,
+                        value: '',
+                        ...options,
+                    })
+                },
+            },
+        }
+    )
 
-    // Refresh session if expired - required for Server Components
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession()
 
-    // If user is not signed in and trying to access protected routes, redirect to login
-    if (!user && !request.nextUrl.pathname.startsWith("/login")) {
-      const redirectUrl = new URL("/login", request.url);
-      return NextResponse.redirect(redirectUrl);
+    // If not logged in and trying to access protected route, redirect to login
+    if (!session && request.nextUrl.pathname !== '/login') {
+        return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    // If user is signed in and trying to access login page, redirect to dashboard
-    if (user && request.nextUrl.pathname === "/login") {
-      const redirectUrl = new URL("/dashboard", request.url);
-      return NextResponse.redirect(redirectUrl);
+    // If logged in and trying to access login page, redirect to dashboard
+    if (session && request.nextUrl.pathname === '/login') {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    return supabaseResponse;
-  } catch (error) {
-    // If middleware fails, allow request through to avoid breaking the app
-    console.error("Middleware error:", error);
-    return NextResponse.next();
-  }
+    return response
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (public folder)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
-};
+    matcher: [
+        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    ],
+}

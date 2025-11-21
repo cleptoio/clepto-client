@@ -1,24 +1,29 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { ClientProvider } from "@/contexts/ClientContext";
+import { Toaster } from "@/components/ui/toaster";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Clepto Client Portal",
-  description: "Client portal for Clepto.io - View your workflow analytics, AI costs, and compliance documentation",
+    title: "Clepto.io Client Portal",
+    description: "AI Automation Agency Client Dashboard - View your workflow executions, analytics, and support tickets",
 };
 
 export default function RootLayout({
-  children,
+    children,
 }: Readonly<{
-  children: React.ReactNode;
+    children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className="font-sans antialiased" style={{ fontFamily: 'Inter, sans-serif' }}>{children}</body>
-    </html>
-  );
+    return (
+        <html lang="en">
+            <body className={inter.className}>
+                <ClientProvider>
+                    {children}
+                    <Toaster />
+                </ClientProvider>
+            </body>
+        </html>
+    );
 }
