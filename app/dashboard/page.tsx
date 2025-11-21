@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useClient } from '@/contexts/ClientContext';
 import { createClient } from '@/lib/supabase';
 import { WorkflowExecution } from '@/types/database';
@@ -24,14 +24,7 @@ export default function DashboardPage() {
     const { toast } = useToast();
     const router = useRouter();
 
-    useEffect(() => {
-        if (!clientLoading && clientId) {
-            fetchExecutions();
-            subscribeToExecutions();
-        }
-    }, [clientId, clientLoading]);
-
-    const fetchExecutions = async () => {
+    const fetchExecutions = useCallback(async () => {
         if (!clientId) return;
 
         try {
@@ -54,9 +47,9 @@ export default function DashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [clientId, toast]);
 
-    const subscribeToExecutions = () => {
+    const subscribeToExecutions = useCallback(() => {
         if (!clientId) return;
 
         const supabase = createClient();
@@ -84,7 +77,14 @@ export default function DashboardPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    };
+    }, [clientId, toast]);
+
+    useEffect(() => {
+        if (!clientLoading && clientId) {
+            fetchExecutions();
+            subscribeToExecutions();
+        }
+    }, [clientId, clientLoading, fetchExecutions, subscribeToExecutions]);
 
     // Calculate metrics
     const currentMonth = new Date().getMonth();
@@ -162,7 +162,7 @@ export default function DashboardPage() {
             <Header />
             <main className="container mx-auto px-4 py-8">
                 <h1 className="text-3xl font-bold mb-2">Welcome back, {client?.name}!</h1>
-                <p className="text-muted-foreground mb-8">Here's an overview of your AI automation activity</p>
+                <p className="text-muted-foreground mb-8">Here&apos;s an overview of your AI automation activity</p>
 
                 {/* Metrics Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
